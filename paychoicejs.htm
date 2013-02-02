@@ -1,0 +1,128 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta http-equiv="Content-type" content="text/html; charset=utf-8" />
+		<title>PayChoice Sample Form</title>
+
+		<script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/1.9.0/jquery.min.js"></script>
+		<script type="text/javascript" src="https://ajax.aspnetcdn.com/ajax/jquery.validate/1.10.0/jquery.validate.min.js"></script>
+
+		<!-- CHANGE TO https://secure.paychoice.com.au/api/v3/paychoice.js FOR PRODUCTION -->
+		<script type="text/javascript" src="https://sandbox.paychoice.com.au/api/v3/paychoice.js"></script>
+		<script type="text/javascript">
+
+			// SET YOUR PUBLIC KEY HERE
+			Paychoice.setPublicKey('{your public key goes here}');
+
+			$(document).ready(function () {
+
+				function submit(form) {
+					try {
+						// form is valid, submit the card details to Paychoice
+						var submitButton = $(form['submit-button']);
+						var errorElement = $(".payment-errors");
+
+						submitButton.attr("disabled", "disabled"); //disable the submit button so that the user can't double charge						
+
+						Paychoice.createToken({
+							name: $('#cardName').val(),
+							number: $('#cardNumber').val(),
+							cvv: $('#cardCvv').val(),
+							expiry_month: $('#cardExpiryMonth').val(),
+							expiry_year: $('#cardExpiryYear').val()
+						}, function (status, response) {
+							if (response.error) {
+								displayError(submitButton, errorElement, response.error.code + ": " + response.error.message);
+							} else {
+								var token = response["card"]["token"]; //the token from paychoice
+								
+								$(".do-not-submit").removeAttr("name"); //remove the fields names so they won't be submitted with the form
+								
+								// insert the Paychoice token and submit
+								var input = $("<input name='paychoiceToken' value='" + token + "' style='display:none;' />");
+								form.appendChild(input[0]);
+								form.submit();
+							}
+						});
+					}
+					catch (e) {
+						displayError(submitButton, errorElement, e.message);
+					}
+				}
+
+				function displayError(submitButton, errorElement, errorMessage) {
+					// re-enable the submit button & show the error
+					submitButton.removeAttr("disabled");
+					errorElement.html(errorMessage);
+				}				
+
+				// add custom rules for credit card validating
+				jQuery.validator.addMethod("card-number", Paychoice.validateCardNumber, "Please enter a valid card number");
+				jQuery.validator.addMethod("card-cvv", Paychoice.validateCVV, "Please enter a valid security code");
+				jQuery.validator.addMethod("card-expiry",
+				function () { return Paychoice.validateExpiry($(".card-expiry-month").val(), $(".card-expiry-year").val()) },
+				"Please enter a valid expiration");
+
+				// We use the jQuery validate plugin to validate required params on submit
+				$("#example-form").validate({ submitHandler: submit });
+
+				});
+		</script>
+	</head>
+	<body>
+
+		<h1>PayChoice Example Form</h1>
+
+		<form action="/" method="get" id="example-form" style="display: none;">
+
+			<div>
+				<label for="cardName">Name on card</label>
+				<input type="text" id="cardName" name="cardName" class="required do-not-submit" />
+			</div>
+
+			<div>
+				<label for="cardNumber">Card Number</label>
+				<input type="text" id="cardNumber" name="cardNumber" autocomplete="off" class="card-number required do-not-submit" />
+			</div>
+
+			<div>
+				<label for="cardCvv">CVV</label>
+				<input type="text" id="cardCvv" name="cardCvv" autocomplete="off" class="card-cvv required do-not-submit" />
+			</div>
+
+			<div>
+				<label for="card-expiry-month">Expiration</label>
+				<div class="expiry-wrapper">
+					<select id="cardExpiryMonth" name="cardExpiryMonth" class="required do-not-submit">
+					</select>
+					<script type="text/javascript">
+						var select = $("#cardExpiryMonth"),
+							month = new Date().getMonth() + 1;
+						
+						for (var i = 1; i <= 12; i++) {
+							select.append($("<option value='" + i + "' " + (month === i ? "selected" : "") + ">" + i + "</option>"))
+						}
+					</script>
+					<span>&nbsp;/&nbsp;</span>
+					<select id="cardExpiryYear" name="cardExpiryYear" class="cardExpiry required do-not-submit"></select>
+					<script type="text/javascript">
+						var select = $("#cardExpiryYear"),
+							year = new Date().getFullYear() - 2000;
+						
+						for (var i = 0; i < 12; i++) {
+							select.append($("<option value='" + (i + year) + "' " + (i === 0 ? "selected" : "") + ">" + (i + year) + "</option>"))
+						}
+					</script>
+				</div>
+			</div>
+
+			<button type="submit" name="submit-button">Submit</button>
+			<span class="payment-errors"></span>
+		</form>
+
+		<script>if (window.Paychoice) { $("#example-form").show(); } else { alert("Paychoice.js library has not been loaded"); }</script>
+		<noscript>
+			<p>JavaScript is required for the form.</p>
+		</noscript>
+	</body>
+</html>
